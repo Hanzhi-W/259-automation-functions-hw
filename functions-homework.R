@@ -17,15 +17,22 @@ ds <- tibble(id, x, y, z)
 #Vectors x, y, and z contain random numbers between 1 and 10. 
 #Write a function called "limit_replace" that will replace values less than 2 or greater than 8 with NA
 #Then, run the function on x and save the results to a new vector "x_replace" to show it worked
+limit_replace <- function (v) {
+  v[v<2 | v>8] <- NA
+  return(v)
+}
 
-
+x_replace <- limit_replace(x)
 ### Question 2 ---------- 
 
 #Make a new version of limit_replace that asks for arguments for a lower bounary and an upper boundary
   #so that they can be customized (instead of being hard coded as 2 and 8)
 #Run the function on vector y with boundaries 4 and 6, saving the results to a new vector "y_replace"
-
-
+boundary_replace <- function (v,lower,upper){
+  v[v<lower | v>upper] <- NA
+  return(v)
+}
+y_replace <- boundary_replace(y,4,6)
 ### Question 3 ----------
 
 #Write a function called "plus_minus_SD" that can take one of the vectors (x/y/z) as input
@@ -33,29 +40,55 @@ ds <- tibble(id, x, y, z)
 #plus_minus_SD(x, 1) would give +/- 1SD around the mean of x, plus_minus_SD(y, 2) would give +/- 2SDs around the mean 
 #Make num_of_SDs default to 1
 #run the new function on x, y, and z with 1 SD
-
-
+plus_minus_SD <- function (v, num_of_SDs=1){
+  mean_v <- mean(v)
+  sd_v <- sd(v)
+  lower <- mean_v - sd_v*num_of_SDs
+  upper <- mean_v + sd_v*num_of_SDs
+  list(lower, upper)
+}
+plus_minus_SD(x,1)
+plus_minus_SD(y,1)
+plus_minus_SD(z,1)
 ### Question 4 ----------
 
 #Write an another new version of limit_replace
 #This time, make the upper and lower boundaries optional arguments
 #If they are not given, use +/- 1 SD as the boundaries (from your plus_minus_SD function)
 #Apply the function to each column in ds, and save the results to a new tibble called "ds_replace"
-
-
+limit_replace <- function(v,lower=NULL, upper= NULL){
+  lower <- ifelse(is.null(lower),plus_minus_SD(v)[[1]],lower)
+  upper <- ifelse(is.null(upper),plus_minus_SD(v)[[2]],upper)
+  v[v<lower | v>upper] <- NA
+  return(v)
+}
+ds_replace <- ds %>% 
+  mutate(across(x:z,limit_replace))
 
 ### Question 5 ----------
 
 #Add a "stopifnot" command to your limit_replace function to make sure it only runs on numeric variables
 #Try running it on a non-numeric input (like "id") to make sure it gives you an error
-
-
-
+limit_replace <- function(v,lower=NULL, upper= NULL){
+  stopifnot(is.numeric(v))
+  lower <- ifelse(is.null(lower),plus_minus_SD(v)[[1]],lower)
+  upper <- ifelse(is.null(upper),plus_minus_SD(v)[[2]],upper)
+  v[v<lower | v>upper] <- NA
+  return(v)
+}
+limit_replace(id)
 ### Question 6 ----------
 
 #What other requirements on the input do you need to make the function work correctly?
 #Add another stopifnot to enforce one more requirement
-
+limit_replace <- function(v,lower=NULL, upper= NULL){
+  stopifnot(is.numeric(v))
+  stopifnot(sum(is.na(v))==0)
+  lower <- ifelse(is.null(lower),plus_minus_SD(v)[[1]],lower)
+  upper <- ifelse(is.null(upper),plus_minus_SD(v)[[2]],upper)
+  v[v<lower | v>upper] <- NA
+  return(v)
+}
 
 
 ### Question 7 ----------
@@ -70,6 +103,14 @@ ds_diamonds <- diamonds
 #Then, load your functions from the external files(s)
 #Next, run your limit_replace function on all of the numeric columns in the new data set
 #and drop any rows with NA, saving it to a new tibble named "ds_trimmed"
+save(limit_replace, file = "func_limit_replace.RData") 
+save(plus_minus_SD, file = "func_plus_minus_SD.RData") 
+load("func_limit_replace.RData") 
+load("func_plus_minus_SD.RData") 
+
+ds_trimmed <- ds_diamonds %>% 
+  mutate(across(where(is.numeric),limit_replace)) %>% 
+  filter(!is.na(x) & !is.na(y) &!is.na(z))
 
 
 ### Question 8 ----------
@@ -116,3 +157,23 @@ ds_trimmed %>% filter(cut == "Good") %>%
   ggtitle("Good, trimmed") +
   theme_minimal()
 
+# Below is the change
+diamonds_plot <- function (ds,ds_type, cut_type){
+  plot <- ds %>% filter(cut == cut_type) %>% 
+    ggplot(aes(x = clarity, y = price)) + 
+    geom_boxplot() + 
+    ggtitle(paste(cut_type,", ",ds_type)) +
+    theme_minimal()
+  print(plot)
+}
+
+for (ds_type in c("all","trimmed")){
+  if (ds_type == "all"){
+    ds <- ds_diamonds
+  }else{
+    ds <- ds_trimmed
+  }
+  for (cut_type in c("Premium","Ideal","Good")){
+    diamonds_plot(ds, ds_type, cut_type)
+  }
+}
